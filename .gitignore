@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-package-lock.json
+# package-lock.json (keep this for reproducible CI/CD builds)
 
 # Test Results
 allure-results/
