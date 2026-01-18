@@ -1,0 +1,101 @@
+name: Playwright Regression Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * *'  # Run daily at 2 AM UTC
+  workflow_dispatch:
+
+jobs:
+  regression-tests:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run regression tests
+        run: npm run test:regression
+        env:
+          CI: true
+
+      - name: Generate Allure Report
+        if: always()
+        run: npm run allure:generate
+
+      - name: Upload Allure Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-regression-shard-${{ matrix.shard }}
+          path: allure-report/
+          retention-days: 30
+
+      - name: Upload Allure Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-regression-shard-${{ matrix.shard }}
+          path: allure-results/
+          retention-days: 30
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-test-reports-shard-${{ matrix.shard }}
+          path: reports/
+          retention-days: 30
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-test-screenshots-shard-${{ matrix.shard }}
+          path: screenshots/
+          retention-days: 7
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## Regression Test Results - Shard ${{ matrix.shard }}" >> $GITHUB_STEP_SUMMARY
+          echo "Test execution completed. Check artifacts for detailed reports." >> $GITHUB_STEP_SUMMARY
+
+  merge-reports:
+    if: always()
+    needs: [regression-tests]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: D        run: npm run test:regress actions/download-artifact@v4
+        with:
+          path: all-reports
+          pattern: regression-test-reports-*
+
+      - name: Report Summary
+        run: |
+          echo "## All Regression Tests Completed" >> $GITHUB_STEP_SUMMARY
+          echo "All shards have finished executing. Review individual shard artifacts for details." >> $GITHUB_STEP_SUMMARY
